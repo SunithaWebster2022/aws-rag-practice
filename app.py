@@ -4,28 +4,29 @@ import sys
 import boto3
 import streamlit as st
 
-## We will be suing Titan Embeddings Model To generate Embedding
-
+## We will be using Titan Embeddings Model To generate Embedding
 from langchain_community.embeddings import BedrockEmbeddings
-from langchain.llms.bedrock import Bedrock
+from langchain_community.llms.bedrock import Bedrock
 
 ## Data Ingestion
-
 import numpy as np
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import PyPDFDirectoryLoader
 
 # Vector Embedding And Vector Store
-
-from langchain.vectorstores import FAISS
+from langchain_community.vectorstores import FAISS
 
 ## LLm Models
 from langchain.prompts import PromptTemplate
 from langchain.chains import RetrievalQA
 
 ## Bedrock Clients
-bedrock=boto3.client(service_name="bedrock-runtime")
-bedrock_embeddings=BedrockEmbeddings(model_id="amazon.titan-embed-text-v1",client=bedrock)
+
+# module_path = ".."
+# sys.path.append(os.path.abspath(module_path))
+
+bedrock=boto3.client(service_name="bedrock-runtime", region_name=os.environ.get("AWS_DEFAULT_REGION", None))
+bedrock_embeddings=BedrockEmbeddings(model_id="amazon.titan-embed-image-v1", client=bedrock)
 
 
 ## Data ingestion
@@ -40,8 +41,8 @@ def data_ingestion():
     docs=text_splitter.split_documents(documents)
     return docs
 
-## Vector Embedding and vector store
 
+## Vector Embedding and vector store
 def get_vector_store(docs):
     vectorstore_faiss=FAISS.from_documents(
         docs,
@@ -49,19 +50,22 @@ def get_vector_store(docs):
     )
     vectorstore_faiss.save_local("faiss_index")
 
-def get_claude_llm():
+
+def get_mistral_large_llm():
     ##create the Anthropic Model
-    llm=Bedrock(model_id="ai21.j2-mid-v1",client=bedrock,
-                model_kwargs={'maxTokens':512})
+    llm=Bedrock(model_id="mistral.mistral-large-2402-v1:0", client=bedrock,
+                model_kwargs={'maxTokens':200})
     
     return llm
 
-def get_llama2_llm():
+
+def get_titan_express_llm():
     ##create the Anthropic Model
-    llm=Bedrock(model_id="meta.llama2-70b-chat-v1",client=bedrock,
-                model_kwargs={'max_gen_len':512})
+    llm=Bedrock(model_id="amazon.titan-text-express-v1", client=bedrock,
+                model_kwargs={'maxTokens':8192})
     
     return llm
+
 
 prompt_template = """
 
@@ -81,7 +85,7 @@ PROMPT = PromptTemplate(
     template=prompt_template, input_variables=["context", "question"]
 )
 
-def get_response_llm(llm,vectorstore_faiss,query):
+def get_response_llm(llm, vectorstore_faiss, query):
     qa = RetrievalQA.from_chain_type(
     llm=llm,
     chain_type="stuff",
@@ -111,10 +115,10 @@ def main():
                 get_vector_store(docs)
                 st.success("Done")
 
-    if st.button("Claude Output"):
+    if st.button("Mistral_Large Output"):
         with st.spinner("Processing..."):
             faiss_index = FAISS.load_local("faiss_index", bedrock_embeddings)
-            llm=get_claude_llm()
+            llm=get_mistral_large_llm()
             
             #faiss_index = get_vector_store(docs)
             st.write(get_response_llm(llm,faiss_index,user_question))
@@ -123,7 +127,7 @@ def main():
     if st.button("Llama2 Output"):
         with st.spinner("Processing..."):
             faiss_index = FAISS.load_local("faiss_index", bedrock_embeddings)
-            llm=get_llama2_llm()
+            llm=get_titan_express_llm()
             
             #faiss_index = get_vector_store(docs)
             st.write(get_response_llm(llm,faiss_index,user_question))
@@ -131,17 +135,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
